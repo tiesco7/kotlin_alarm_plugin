@@ -74,6 +74,7 @@ class FlutterAlarmClockPlugin : FlutterPlugin, MethodCallHandler, ActivityAware 
             i.putExtra(AlarmClock.EXTRA_HOUR, hour)
             i.putExtra(AlarmClock.EXTRA_MINUTES, minutes)
             i.putExtra(AlarmClock.EXTRA_MESSAGE, title)
+            // 
             i.putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
             activity.startActivity(i)
         } catch (e: Exception) {
@@ -87,6 +88,8 @@ class FlutterAlarmClockPlugin : FlutterPlugin, MethodCallHandler, ActivityAware 
             val i = Intent(AlarmClock.ACTION_SET_TIMER)
             i.putExtra(AlarmClock.EXTRA_LENGTH, length)
             i.putExtra(AlarmClock.EXTRA_MESSAGE, title)
+            i.putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
+            // Cria alarme do sistema, sem mostrar a UI do sistema
             activity.startActivity(i)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar timer: ${e.message}")
@@ -96,11 +99,13 @@ class FlutterAlarmClockPlugin : FlutterPlugin, MethodCallHandler, ActivityAware 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     private fun showAlarms() {
         val i = Intent(ACTION_SHOW_ALARMS)
+        // Abre a tela de alarmes do sistema Android
         activity.startActivity(i)
     }
 
     private fun showTimers() {
         val i = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Abre a tela de Timer do sistema Android
             Intent(ACTION_SHOW_TIMERS)
         } else {
             TODO("VERSION.SDK_INT < O")
