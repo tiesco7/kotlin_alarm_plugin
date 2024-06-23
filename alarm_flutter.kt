@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.AlarmClock
-import android.provider.AlarmClock.ACTION_SHOW_ALARMS
-import android.provider.AlarmClock.ACTION_SHOW_TIMERS
 import android.util.Log
 import androidx.annotation.NonNull
 import androidx.annotation.RequiresApi
@@ -16,6 +14,7 @@ import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
 
 class FlutterAlarmClockPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
@@ -29,87 +28,111 @@ class FlutterAlarmClockPlugin : FlutterPlugin, MethodCallHandler, ActivityAware 
         context = flutterPluginBinding.applicationContext
     }
 
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         when (call.method) {
-            "showAlarms" -> showAlarms()
+            "showAlarms" -> showAlarms(result)
             "createAlarm" -> {
                 val hour = call.argument<Int>("hour")
                 val minutes = call.argument<Int>("minutes")
                 val title = call.argument<String>("title")
                 val skipUi = call.argument<Boolean>("skipUi") ?: true
                 if (hour != null && minutes != null) {
-                    createAlarm(hour, minutes, title, skipUi)
+                    createAlarm(hour, minutes, title, skipUi, result)
                 } else {
-                    Log.e(TAG, "Hora e minutos devem ser fornecidos")
+                    result.error("INVALID_ARGUMENTS", "Hora e minutos devem ser fornecidos", null)
                 }
             }
-            "showTimers" -> showTimers()
+            "showTimers" -> showTimers(result)
             "createTimer" -> {
                 val length = call.argument<Int>("length")
                 val title = call.argument<String>("title")
                 val skipUi = call.argument<Boolean>("skipUi") ?: true
                 if (length != null) {
-                    createTimer(length, title, skipUi)
+                    createTimer(length, title, skipUi, result)
                 } else {
-                    Log.e(TAG, "O valor deve ser fornecido")
+                    result.error("INVALID_ARGUMENTS", "O valor deve ser fornecido", null)
                 }
             }
             else -> result.notImplemented()
         }
     }
 
-    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {}
-    override fun onDetachedFromActivity() {}
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {}
-    
+    override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        onAttachedToActivity(binding)
+    }
+
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {}
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
 
-    private fun createAlarm(hour: Int, minutes: Int, title: String? = "", skipUi: Boolean = true) {
+    private fun createAlarm(hour: Int, minutes: Int, title: String?, skipUi: Boolean, result: Result) {
         try {
-            val i = Intent(AlarmClock.ACTION_SET_ALARM)
-            i.putExtra(AlarmClock.EXTRA_HOUR, hour)
-            i.putExtra(AlarmClock.EXTRA_MINUTES, minutes)
-            i.putExtra(AlarmClock.EXTRA_MESSAGE, title)
-            // 
-            i.putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
-            activity.startActivity(i)
+            val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                putExtra(AlarmClock.EXTRA_HOUR, hour)
+                putExtra(AlarmClock.EXTRA_MINUTES, minutes)
+                putExtra(AlarmClock.EXTRA_MESSAGE, title)
+                putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
+            }
+            activity.startActivity(intent)
+            result.success(null)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar alarme: ${e.message}")
+            result.error("CREATE_ALARM_ERROR", e.message, null)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
-    private fun createTimer(length: Int, title: String? = "", skipUi: Boolean = true) {
+    private fun createTimer(length: Int, title: String?, skipUi: Boolean, result: Result) {
         try {
-            val i = Intent(AlarmClock.ACTION_SET_TIMER)
-            i.putExtra(AlarmClock.EXTRA_LENGTH, length)
-            i.putExtra(AlarmClock.EXTRA_MESSAGE, title)
-            i.putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
-            // Cria alarme do sistema, sem mostrar a UI do sistema
-            activity.startActivity(i)
+            val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+                putExtra(AlarmClock.EXTRA_LENGTH, length)
+                putExtra(AlarmClock.EXTRA_MESSAGE, title)
+                putExtra(AlarmClock.EXTRA_SKIP_UI, skipUi)
+            }
+            activity.startActivity(intent)
+            result.success(null)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar timer: ${e.message}")
+            result.error("CREATE_TIMER_ERROR", e.message, null)
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
-    private fun showAlarms() {
-        val i = Intent(ACTION_SHOW_ALARMS)
-        // Abre a tela de alarmes do sistema Android
-        activity.startActivity(i)
+    private fun showAlarms(result: Result) {
+        try {
+            val intent = Intent(AlarmClock.ACTION_SHOW_ALARMS)
+            activity.startActivity(intent)
+            result.success(null)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao mostrar alarmes: ${e.message}")
+            result.error("SHOW_ALARMS_ERROR", e.message, null)
+        }
     }
 
-    private fun showTimers() {
-        val i = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Abre a tela de Timer do sistema Android
-            Intent(ACTION_SHOW_TIMERS)
-        } else {
-            TODO("VERSION.SDK_INT < O")
+    private fun showTimers(result: Result) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(AlarmClock.ACTION_SHOW_TIMERS)
+                activity.startActivity(intent)
+                result.success(null)
+            } else {
+                result.error("UNSUPPORTED_VERSION", "Versão do Android não suportada", null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao mostrar timers: ${e.message}")
+            result.error("SHOW_TIMERS_ERROR", e.message, null)
         }
-        activity.startActivity(i)
     }
 }
